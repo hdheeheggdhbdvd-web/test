@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DropVault — ফাইল হোস্টিং</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3d;
+    --accent: #7c5cfc;
+    --accent2: #a78bfa;
+    --accent-glow: rgba(124, 92, 252, 0.25);
+    --text: #e8e8f0;
+    --muted: #6b6b8a;
+    --success: #22d3a0;
+    --warning: #f59e0b;
+    --danger: #f43f5e;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Space Grotesk', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* NAV */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(10,10,15,0.9);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo {
+    font-size: 1.3rem; font-weight: 700; letter-spacing: -0.5px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px; background: var(--accent);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; box-shadow: 0 0 16px var(--accent-glow);
+  }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .nav-stats { display: flex; gap: 24px; font-size: 0.8rem; color: var(--muted); font-family: var(--mono); }
+  .nav-stat span { color: var(--accent2); font-weight: 600; }
+  .settings-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); padding: 7px 14px; border-radius: 8px;
+    cursor: pointer; font-size: 0.82rem; font-family: var(--sans);
+    transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+  }
+  .settings-btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .github-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.78rem; font-family: var(--mono);
+    padding: 6px 12px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface2);
+  }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+  .status-dot.connected { background: var(--success); box-shadow: 0 0 8px var(--success); }
+
+  /* MAIN */
+  main { flex: 1; padding: 40px 32px; max-width: 1100px; margin: 0 auto; width: 100%; }
+
+  /* SETUP BANNER */
+  .setup-banner {
+    background: linear-gradient(135deg, rgba(124,92,252,0.12), rgba(167,139,250,0.06));
+    border: 1px solid rgba(124,92,252,0.3);
+    border-radius: 16px; padding: 20px 24px;
+    margin-bottom: 28px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .setup-banner.hidden { display: none; }
+  .setup-icon { font-size: 1.8rem; flex-shrink: 0; }
+  .setup-text { flex: 1; }
+  .setup-text strong { display: block; margin-bottom: 4px; }
+  .setup-text p { font-size: 0.85rem; color: var(--muted); }
+  .setup-open-btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 10px 20px; border-radius: 8px; font-family: var(--sans);
+    font-weight: 600; font-size: 0.875rem; cursor: pointer;
+    white-space: nowrap; transition: all 0.2s;
+    box-shadow: 0 4px 16px var(--accent-glow);
+  }
+  .setup-open-btn:hover { background: #6b4fe8; }
+
+  /* UPLOAD ZONE */
+  .upload-section { margin-bottom: 40px; }
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 20px;
+    padding: 60px 40px; text-align: center; cursor: pointer;
+    transition: all 0.25s; background: var(--surface);
+    position: relative; overflow: hidden;
+  }
+  .upload-zone::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, var(--accent-glow) 0%, transparent 70%);
+    opacity: 0; transition: opacity 0.3s; pointer-events: none;
+  }
+  .upload-zone:hover::before, .upload-zone.dragover::before { opacity: 1; }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent); transform: translateY(-2px);
+    box-shadow: 0 8px 40px var(--accent-glow);
+  }
+  .upload-icon { font-size: 3.5rem; margin-bottom: 16px; filter: drop-shadow(0 0 12px var(--accent)); }
+  .upload-title { font-size: 1.4rem; font-weight: 600; margin-bottom: 8px; }
+  .upload-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+  .upload-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #fff; border: none;
+    padding: 12px 28px; border-radius: 10px; font-family: var(--sans);
+    font-size: 0.95rem; font-weight: 600; cursor: pointer;
+    transition: all 0.2s; box-shadow: 0 4px 20px var(--accent-glow);
+  }
+  .upload-btn:hover { background: #6b4fe8; transform: translateY(-1px); }
+  .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  #fileInput { display: none; }
+
+  /* PROGRESS */
+  .progress-container { margin-top: 20px; display: none; }
+  .progress-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 18px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .progress-icon { font-size: 1.4rem; flex-shrink: 0; }
+  .progress-info { flex: 1; min-width: 0; }
+  .progress-name { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .progress-size { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); }
+  .progress-bar-wrap { height: 4px; background: var(--border); border-radius: 99px; margin-top: 8px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.15s; }
+  .progress-pct { font-family: var(--mono); font-size: 0.8rem; color: var(--accent2); flex-shrink: 0; }
+
+  /* FILTER BAR */
+  .filter-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .search-wrap { flex: 1; min-width: 200px; position: relative; }
+  .search-wrap input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 16px 10px 40px; color: var(--text);
+    font-family: var(--sans); font-size: 0.9rem; outline: none; transition: border-color 0.2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 1rem; pointer-events: none; }
+  .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    padding: 7px 14px; border-radius: 99px; background: var(--surface2);
+    border: 1px solid var(--border); color: var(--muted); font-size: 0.8rem;
+    font-weight: 500; cursor: pointer; transition: all 0.2s; white-space: nowrap;
+  }
+  .chip.active, .chip:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sort-select {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--sans); font-size: 0.85rem; padding: 8px 12px;
+    border-radius: 10px; outline: none; cursor: pointer;
+  }
+
+  /* FILE GRID */
+  .files-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .files-count { font-size: 0.85rem; color: var(--muted); font-family: var(--mono); }
+  .view-toggle { display: flex; gap: 6px; }
+  .view-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--muted);
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 1rem;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+  }
+  .view-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .file-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .file-grid.list-view { grid-template-columns: 1fr; }
+
+  .file-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px; position: relative;
+    transition: all 0.2s; cursor: default; animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  .file-card:hover { border-color: var(--accent); box-shadow: 0 4px 24px var(--accent-glow); transform: translateY(-2px); }
+  .file-grid.list-view .file-card { display: flex; align-items: center; gap: 16px; padding: 14px 18px; }
+
+  .file-thumb {
+    width: 56px; height: 56px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; margin-bottom: 14px; flex-shrink: 0; overflow: hidden;
+  }
+  .file-thumb img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; }
+  .list-view .file-thumb { margin-bottom: 0; width: 44px; height: 44px; font-size: 1.4rem; }
+
+  .file-name { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); }
+  .list-view .file-info { flex: 1; min-width: 0; }
+
+  .file-actions { display: flex; gap: 6px; margin-top: 14px; }
+  .list-view .file-actions { margin-top: 0; margin-left: auto; flex-shrink: 0; }
+  .action-btn {
+    flex: 1; padding: 7px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--muted); font-size: 0.85rem;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+  }
+  .list-view .action-btn { flex: none; width: 34px; height: 34px; padding: 0; }
+  .action-btn:hover.copy { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .action-btn:hover.open { background: var(--success); border-color: var(--success); color: #fff; }
+  .action-btn:hover.delete { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+  .file-badge {
+    position: absolute; top: 12px; right: 12px;
+    font-size: 0.65rem; font-family: var(--mono); font-weight: 600;
+    padding: 3px 8px; border-radius: 99px; background: var(--surface2);
+    color: var(--muted); border: 1px solid var(--border);
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .list-view .file-badge { position: static; }
+
+  /* EMPTY STATE */
+  .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); }
+  .empty-state .empty-icon { font-size: 4rem; margin-bottom: 16px; opacity: 0.4; }
+
+  /* TOAST */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 10px; }
+  .toast {
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 12px 20px; border-radius: 12px; font-size: 0.875rem; font-weight: 500;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4); animation: slideIn 0.3s ease; max-width: 320px;
+  }
+  @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:none; } }
+  .toast.success { border-color: var(--success); }
+  .toast.error { border-color: var(--danger); }
+  .toast.info { border-color: var(--accent); }
+
+  /* MODAL — SHARE */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px); z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 32px; width: 90%; max-width: 500px;
+    transform: scale(0.95); transition: transform 0.2s;
+  }
+  .modal-overlay.open .modal { transform: scale(1); }
+  .modal h3 { font-size: 1.1rem; margin-bottom: 20px; }
+  .link-box { display: flex; gap: 8px; }
+  .link-box input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 0.78rem;
+    padding: 10px 14px; border-radius: 8px; outline: none;
+  }
+  .copy-link-btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 10px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;
+    transition: background 0.2s; white-space: nowrap;
+  }
+  .copy-link-btn:hover { background: #6b4fe8; }
+  .modal-close {
+    display: block; margin-top: 20px; text-align: center;
+    color: var(--muted); font-size: 0.85rem; cursor: pointer; transition: color 0.2s;
+  }
+  .modal-close:hover { color: var(--text); }
+  .share-preview {
+    margin-top: 16px; padding: 12px; background: var(--surface2);
+    border-radius: 10px; font-size: 0.8rem; color: var(--muted);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .share-preview a { color: var(--accent2); text-decoration: none; word-break: break-all; }
+  .share-preview a:hover { text-decoration: underline; }
+
+  /* MODAL — SETTINGS */
+  .settings-modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 20px; padding: 32px; width: 90%; max-width: 540px;
+    transform: scale(0.95); transition: transform 0.2s;
+  }
+  .modal-overlay.open .settings-modal { transform: scale(1); }
+  .settings-modal h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 6px; }
+  .settings-modal .sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 24px; }
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; font-family: var(--mono); }
+  .field input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--mono); font-size: 0.85rem;
+    padding: 11px 14px; border-radius: 8px; outline: none; transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field .hint { font-size: 0.75rem; color: var(--muted); margin-top: 5px; }
+  .field .hint a { color: var(--accent2); }
+  .settings-actions { display: flex; gap: 10px; margin-top: 24px; }
+  .save-btn {
+    flex: 1; background: var(--accent); color: #fff; border: none;
+    padding: 12px; border-radius: 10px; font-family: var(--sans);
+    font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 4px 16px var(--accent-glow);
+  }
+  .save-btn:hover { background: #6b4fe8; }
+  .test-btn {
+    background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+    padding: 12px 20px; border-radius: 10px; font-family: var(--sans);
+    font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s;
+  }
+  .test-btn:hover { border-color: var(--accent); color: var(--accent2); }
+
+  /* STORAGE METER */
+  .storage-bar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 22px; margin-bottom: 32px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .storage-label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+  .storage-track { flex: 1; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .storage-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 99px; transition: width 0.5s; }
+  .storage-used { font-family: var(--mono); font-size: 0.8rem; color: var(--accent2); white-space: nowrap; }
+
+  @media (max-width: 600px) {
+    nav { padding: 14px 18px; }
+    .nav-stats { display: none; }
+    main { padding: 24px 16px; }
+    .upload-zone { padding: 40px 20px; }
+    .filter-bar { gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-icon">📦</div>
+    DropVault
+  </div>
+  <div class="nav-right">
+    <div class="nav-stats">
+      <div class="nav-stat">ফাইল: <span id="navCount">0</span></div>
+      <div class="nav-stat">স্টোরেজ: <span id="navStorage">0 B</span></div>
+    </div>
+    <div class="github-status" id="githubStatus">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">সংযুক্ত নয়</span>
+    </div>
+    <button class="settings-btn" onclick="openSettings()">⚙️ GitHub সেটআপ</button>
+  </div>
+</nav>
+
+<main>
+  <!-- Setup Banner -->
+  <div class="setup-banner" id="setupBanner">
+    <div class="setup-icon">🔗</div>
+    <div class="setup-text">
+      <strong>GitHub সংযুক্ত করুন</strong>
+      <p>ফাইল আপলোড করে real শেয়ারযোগ্য লিংক পেতে GitHub repo সেটআপ করুন।</p>
+    </div>
+    <button class="setup-open-btn" onclick="openSettings()">এখনই সেটআপ করুন</button>
+  </div>
+
+  <!-- Storage Meter -->
+  <div class="storage-bar">
+    <div class="storage-label">GitHub স্টোরেজ</div>
+    <div class="storage-track"><div class="storage-fill" id="storageFill" style="width:0%"></div></div>
+    <div class="storage-used" id="storageUsed">0 B আপলোড হয়েছে</div>
+  </div>
+
+  <!-- Upload Zone -->
+  <div class="upload-section">
+    <div class="upload-zone" id="dropZone">
+      <div class="upload-icon">☁️</div>
+      <div class="upload-title">ফাইল আপলোড করুন</div>
+      <div class="upload-sub">যেকোনো ফাইল ড্র্যাগ করুন অথবা ব্রাউজ করুন · সর্বোচ্চ 25 MB</div>
+      <button class="upload-btn" id="uploadBtn" onclick="document.getElementById('fileInput').click()">
+        📂 ফাইল বেছে নিন
+      </button>
+      <input type="file" id="fileInput" multiple>
+    </div>
+    <div class="progress-container" id="progressContainer"></div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="searchInput" placeholder="ফাইল খুঁজুন...">
+    </div>
+    <div class="filter-chips">
+      <div class="chip active" data-type="all">সব</div>
+      <div class="chip" data-type="image">🖼️ ছবি</div>
+      <div class="chip" data-type="video">🎬 ভিডিও</div>
+      <div class="chip" data-type="audio">🎵 অডিও</div>
+      <div class="chip" data-type="doc">📄 ডকুমেন্ট</div>
+      <div class="chip" data-type="archive">🗜️ আর্কাইভ</div>
+      <div class="chip" data-type="code">💻 কোড</div>
+    </div>
+    <select class="sort-select" id="sortSelect">
+      <option value="newest">নতুন আগে</option>
+      <option value="oldest">পুরনো আগে</option>
+      <option value="name">নাম (A-Z)</option>
+      <option value="size">সাইজ (বড়)</option>
+    </select>
+  </div>
+
+  <!-- Files Header -->
+  <div class="files-header">
+    <div class="files-count" id="filesCount">0 টি ফাইল</div>
+    <div class="view-toggle">
+      <button class="view-btn active" id="gridViewBtn" title="গ্রিড ভিউ">⊞</button>
+      <button class="view-btn" id="listViewBtn" title="লিস্ট ভিউ">☰</button>
+    </div>
+  </div>
+
+  <!-- File Grid -->
+  <div class="file-grid" id="fileGrid">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">📭</div>
+      <p>এখনো কোনো ফাইল আপলোড হয়নি।<br>উপরে ড্র্যাগ করুন বা ক্লিক করুন।</p>
+    </div>
+  </div>
+</main>
+
+<!-- Share Modal -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal">
+    <h3>🔗 ফাইল শেয়ার করুন</h3>
+    <div class="link-box">
+      <input type="text" id="shareLink" readonly>
+      <button class="copy-link-btn" onclick="copyShareLink()">কপি</button>
+    </div>
+    <div class="share-preview" id="sharePreview">
+      <span>🌐</span>
+      <a href="#" id="shareAnchor" target="_blank">লিংক খুলুন →</a>
+    </div>
+    <span class="modal-close" onclick="closeModal('shareModal')">বন্ধ করুন</span>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="settings-modal">
+    <h3>⚙️ GitHub সেটআপ</h3>
+    <p class="sub">একবার সেটআপ করলেই হবে — সব তথ্য আপনার browser-এ সেভ থাকবে।</p>
+
+    <div class="field">
+      <label>GitHub Username</label>
+      <input type="text" id="ghUsername" placeholder="আপনার GitHub username">
+    </div>
+    <div class="field">
+      <label>Repository নাম</label>
+      <input type="text" id="ghRepo" placeholder="যেমন: dropvault-files">
+      <div class="hint">Repo টি <strong>public</strong> হতে হবে এবং আগে থেকে তৈরি থাকতে হবে।</div>
+    </div>
+    <div class="field">
+      <label>Personal Access Token</label>
+      <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      <div class="hint">
+        <a href="https://github.com/settings/tokens/new?scopes=repo&description=DropVault" target="_blank">এখানে ক্লিক করে Token বানান</a>
+        — শুধু <strong>repo</strong> scope দিলেই হবে।
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button class="test-btn" onclick="testConnection()">🔍 পরীক্ষা করুন</button>
+      <button class="save-btn" onclick="saveSettings()">💾 সেভ করুন</button>
+    </div>
+    <span class="modal-close" onclick="closeModal('settingsModal')">বন্ধ করুন</span>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+  // ── STATE ──────────────────────────────────────────────
+  let files = JSON.parse(localStorage.getItem('dropvault_files') || '[]');
+  let currentFilter = 'all';
+  let currentSort = 'newest';
+  let searchQuery = '';
+  let isListView = false;
+
+  // GitHub config
+  function getConfig() {
+    return {
+      username: localStorage.getItem('dv_username') || '',
+      repo:     localStorage.getItem('dv_repo') || '',
+      token:    localStorage.getItem('dv_token') || '',
+    };
+  }
+  function isConfigured() {
+    const c = getConfig();
+    return c.username && c.repo && c.token;
+  }
+
+  // ── FILE TYPE ──────────────────────────────────────────
+  const typeMap = {
+    image:   { exts: ['jpg','jpeg','png','gif','webp','svg','bmp','ico','tiff','avif'], icon: '🖼️', color: '#7c5cfc22' },
+    video:   { exts: ['mp4','mkv','avi','mov','wmv','flv','webm','m4v','3gp'], icon: '🎬', color: '#f59e0b22' },
+    audio:   { exts: ['mp3','wav','ogg','flac','aac','m4a','wma','opus'], icon: '🎵', color: '#22d3a022' },
+    doc:     { exts: ['pdf','doc','docx','xls','xlsx','ppt','pptx','txt','md','rtf','odt','csv'], icon: '📄', color: '#3b82f622' },
+    archive: { exts: ['zip','rar','7z','tar','gz','bz2','xz','iso'], icon: '🗜️', color: '#f43f5e22' },
+    code:    { exts: ['js','ts','py','html','css','json','xml','php','java','c','cpp','cs','go','rs','rb','swift'], icon: '💻', color: '#a78bfa22' },
+  };
+
+  function getFileType(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    for (const [type, cfg] of Object.entries(typeMap)) {
+      if (cfg.exts.includes(ext)) return { type, ...cfg };
+    }
+    return { type: 'other', icon: '📁', color: '#6b6b8a22' };
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024**2) return (bytes/1024).toFixed(1) + ' KB';
+    if (bytes < 1024**3) return (bytes/1024**2).toFixed(1) + ' MB';
+    return (bytes/1024**3).toFixed(1) + ' GB';
+  }
+
+  function formatDate(ts) {
+    return new Date(ts).toLocaleDateString('bn-BD', { day:'2-digit', month:'short', year:'numeric' });
+  }
+
+  function totalSize() { return files.reduce((s,f) => s + f.size, 0); }
+  function saveFiles() { localStorage.setItem('dropvault_files', JSON.stringify(files)); }
+
+  // ── GITHUB RAW URL ─────────────────────────────────────
+  function getRawUrl(filename) {
+    const { username, repo } = getConfig();
+    return `https://raw.githubusercontent.com/${username}/${repo}/main/${filename}`;
+  }
+
+  // ── GITHUB UPLOAD ──────────────────────────────────────
+  async function uploadToGitHub(file, base64Content, onProgress) {
+    const { username, repo, token } = getConfig();
+    // unique filename: timestamp_originalname (spaces replaced)
+    const safeName = file.name.replace(/\s+/g, '_');
+    const filename = `${Date.now()}_${safeName}`;
+    const url = `https://api.github.com/repos/${username}/${repo}/contents/${filename}`;
+
+    onProgress(30);
+
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github+json',
+      },
+      body: JSON.stringify({
+        message: `Upload ${file.name}`,
+        content: base64Content,
+      }),
+    });
+
+    onProgress(90);
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || 'GitHub আপলোড ব্যর্থ');
+    }
+
+    const data = await res.json();
+    onProgress(100);
+    return { filename, rawUrl: getRawUrl(filename), sha: data.content.sha };
+  }
+
+  // ── GITHUB DELETE ──────────────────────────────────────
+  async function deleteFromGitHub(filename, sha) {
+    const { username, repo, token } = getConfig();
+    const url = `https://api.github.com/repos/${username}/${repo}/contents/${filename}`;
+    await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github+json',
+      },
+      body: JSON.stringify({ message: `Delete ${filename}`, sha }),
+    });
+  }
+
+  // ── FILE TO BASE64 ─────────────────────────────────────
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        // Remove data URL prefix, keep only base64
+        const base64 = e.target.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // ── HANDLE FILES ───────────────────────────────────────
+  async function handleFiles(fileList) {
+    if (!isConfigured()) {
+      toast('আগে GitHub সেটআপ করুন!', 'error');
+      openSettings();
+      return;
+    }
+
+    const container = document.getElementById('progressContainer');
+    container.style.display = 'block';
+
+    for (const file of Array.from(fileList)) {
+      if (file.size > 25 * 1024 * 1024) {
+        toast(`${file.name} — 25 MB এর বেশি!`, 'error');
+        continue;
+      }
+
+      const ftInfo = getFileType(file.name);
+      const id = Math.random().toString(36).substr(2,9) + Date.now().toString(36);
+
+      // Progress UI
+      const item = document.createElement('div');
+      item.className = 'progress-item';
+      item.innerHTML = `
+        <div class="progress-icon">${ftInfo.icon}</div>
+        <div class="progress-info">
+          <div class="progress-name">${file.name}</div>
+          <div class="progress-size">${formatSize(file.size)}</div>
+          <div class="progress-bar-wrap"><div class="progress-bar" id="pb_${id}" style="width:0%"></div></div>
+        </div>
+        <div class="progress-pct" id="pp_${id}">0%</div>
+      `;
+      container.appendChild(item);
+
+      const setProgress = (pct) => {
+        const pb = document.getElementById(`pb_${id}`);
+        const pp = document.getElementById(`pp_${id}`);
+        if (pb) pb.style.width = pct + '%';
+        if (pp) pp.textContent = Math.round(pct) + '%';
+      };
+
+      try {
+        setProgress(10);
+        const base64 = await fileToBase64(file);
+        setProgress(20);
+
+        const { filename, rawUrl, sha } = await uploadToGitHub(file, base64, setProgress);
+
+        // Preview thumb for images
+        let thumbHtml = '';
+        if (ftInfo.type === 'image') {
+          thumbHtml = `data:image/jpeg;base64,${base64}`;
+        }
+
+        const fileData = {
+          id,
+          name: file.name,
+          size: file.size,
+          type: ftInfo.type,
+          icon: ftInfo.icon,
+          uploadedAt: Date.now(),
+          rawUrl,
+          filename, // GitHub filename
+          sha,
+          thumbDataUrl: thumbHtml,
+        };
+
+        files.unshift(fileData);
+        saveFiles();
+        updateNav();
+        renderFiles();
+        toast(`${file.name} GitHub-এ আপলোড সফল! ✅`, 'success');
+        setTimeout(() => item.remove(), 1500);
+
+      } catch (err) {
+        toast(`${file.name} — ${err.message}`, 'error');
+        item.remove();
+      }
+    }
+  }
+
+  // ── DRAG & DROP ────────────────────────────────────────
+  const dropZone = document.getElementById('dropZone');
+  dropZone.addEventListener('click', e => {
+    if (e.target.closest('.upload-btn')) return;
+    document.getElementById('fileInput').click();
+  });
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+  document.getElementById('fileInput').addEventListener('change', e => {
+    handleFiles(e.target.files);
+    e.target.value = '';
+  });
+
+  // ── RENDER FILES ───────────────────────────────────────
+  function renderFiles() {
+    const grid = document.getElementById('fileGrid');
+    const empty = document.getElementById('emptyState');
+
+    let filtered = files.filter(f => {
+      const matchType = currentFilter === 'all' || f.type === currentFilter;
+      const matchSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchType && matchSearch;
+    });
+
+    filtered.sort((a,b) => {
+      if (currentSort === 'newest') return b.uploadedAt - a.uploadedAt;
+      if (currentSort === 'oldest') return a.uploadedAt - b.uploadedAt;
+      if (currentSort === 'name') return a.name.localeCompare(b.name);
+      if (currentSort === 'size') return b.size - a.size;
+    });
+
+    document.getElementById('filesCount').textContent = `${filtered.length} টি ফাইল`;
+    grid.querySelectorAll('.file-card').forEach(el => el.remove());
+
+    if (filtered.length === 0) { empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+
+    filtered.forEach(f => {
+      const ftInfo = getFileType(f.name);
+      const card = document.createElement('div');
+      card.className = 'file-card';
+      const ext = f.name.split('.').pop().toUpperCase();
+
+      card.innerHTML = `
+        <span class="file-badge">${ext}</span>
+        <div class="file-thumb" style="background:${ftInfo.color}">
+          ${f.thumbDataUrl ? `<img src="${f.thumbDataUrl}" alt="">` : ftInfo.icon}
+        </div>
+        <div class="file-info">
+          <div class="file-name" title="${f.name}">${f.name}</div>
+          <div class="file-meta">${formatSize(f.size)} · ${formatDate(f.uploadedAt)}</div>
+        </div>
+        <div class="file-actions">
+          <button class="action-btn copy" title="লিংক কপি" onclick="shareFile('${f.id}')">🔗</button>
+          <button class="action-btn open" title="ফাইল খুলুন" onclick="openFile('${f.id}')">↗️</button>
+          <button class="action-btn delete" title="মুছুন" onclick="deleteFile('${f.id}')">🗑️</button>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  // ── SHARE / OPEN ───────────────────────────────────────
+  function shareFile(id) {
+    const file = files.find(f => f.id === id);
+    if (!file) return;
+    document.getElementById('shareLink').value = file.rawUrl;
+    const anchor = document.getElementById('shareAnchor');
+    anchor.href = file.rawUrl;
+    anchor.textContent = file.rawUrl;
+    document.getElementById('shareModal').classList.add('open');
+  }
+
+  function openFile(id) {
+    const file = files.find(f => f.id === id);
+    if (!file) return;
+    window.open(file.rawUrl, '_blank');
+  }
+
+  function copyShareLink() {
+    const input = document.getElementById('shareLink');
+    navigator.clipboard.writeText(input.value).then(() => {
+      toast('লিংক কপি হয়েছে! 🎉', 'success');
+      closeModal('shareModal');
+    }).catch(() => {
+      input.select(); document.execCommand('copy');
+      toast('লিংক কপি হয়েছে!', 'success');
+      closeModal('shareModal');
+    });
+  }
+
+  // ── DELETE ─────────────────────────────────────────────
+  async function deleteFile(id) {
+    const file = files.find(f => f.id === id);
+    if (!file) return;
+    if (!confirm(`"${file.name}" GitHub থেকে মুছে ফেলবেন?`)) return;
+
+    try {
+      if (file.sha && file.filename && isConfigured()) {
+        await deleteFromGitHub(file.filename, file.sha);
+      }
+    } catch(e) {
+      console.warn('GitHub delete failed', e);
+    }
+
+    files = files.filter(f => f.id !== id);
+    saveFiles();
+    updateNav();
+    renderFiles();
+    toast(`${file.name} মুছে ফেলা হয়েছে`, 'info');
+  }
+
+  // ── SETTINGS ───────────────────────────────────────────
+  function openSettings() {
+    const c = getConfig();
+    document.getElementById('ghUsername').value = c.username;
+    document.getElementById('ghRepo').value = c.repo;
+    document.getElementById('ghToken').value = c.token;
+    document.getElementById('settingsModal').classList.add('open');
+  }
+
+  function saveSettings() {
+    const username = document.getElementById('ghUsername').value.trim();
+    const repo = document.getElementById('ghRepo').value.trim();
+    const token = document.getElementById('ghToken').value.trim();
+    if (!username || !repo || !token) { toast('সব তথ্য দিন!', 'error'); return; }
+    localStorage.setItem('dv_username', username);
+    localStorage.setItem('dv_repo', repo);
+    localStorage.setItem('dv_token', token);
+    toast('সেটিংস সেভ হয়েছে ✅', 'success');
+    closeModal('settingsModal');
+    updateStatus();
+  }
+
+  async function testConnection() {
+    const username = document.getElementById('ghUsername').value.trim();
+    const repo = document.getElementById('ghRepo').value.trim();
+    const token = document.getElementById('ghToken').value.trim();
+    if (!username || !repo || !token) { toast('আগে সব তথ্য দিন!', 'error'); return; }
+
+    toast('পরীক্ষা করা হচ্ছে...', 'info');
+    try {
+      const res = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github+json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast(`✅ সংযোগ সফল! Repo: ${data.full_name}`, 'success');
+      } else {
+        toast('❌ সংযোগ ব্যর্থ — username/repo/token চেক করুন', 'error');
+      }
+    } catch(e) {
+      toast('❌ নেটওয়ার্ক সমস্যা', 'error');
+    }
+  }
+
+  // ── MODAL ─────────────────────────────────────────────
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+  document.getElementById('shareModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('shareModal')) closeModal('shareModal');
+  });
+  document.getElementById('settingsModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('settingsModal')) closeModal('settingsModal');
+  });
+
+  // ── NAV / STATUS ───────────────────────────────────────
+  function updateNav() {
+    document.getElementById('navCount').textContent = files.length;
+    const used = totalSize();
+    document.getElementById('navStorage').textContent = formatSize(used);
+    document.getElementById('storageUsed').textContent = `${formatSize(used)} আপলোড হয়েছে`;
+    const pct = Math.min((used / (1024**3)) * 100, 100); // 1 GB reference
+    document.getElementById('storageFill').style.width = pct + '%';
+  }
+
+  function updateStatus() {
+    const configured = isConfigured();
+    document.getElementById('statusDot').className = 'status-dot' + (configured ? ' connected' : '');
+    const { username, repo } = getConfig();
+    document.getElementById('statusText').textContent = configured ? `${username}/${repo}` : 'সংযুক্ত নয়';
+    document.getElementById('setupBanner').className = 'setup-banner' + (configured ? ' hidden' : '');
+  }
+
+  // ── FILTERS ───────────────────────────────────────────
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentFilter = chip.dataset.type;
+      renderFiles();
+    });
+  });
+  document.getElementById('searchInput').addEventListener('input', e => {
+    searchQuery = e.target.value; renderFiles();
+  });
+  document.getElementById('sortSelect').addEventListener('change', e => {
+    currentSort = e.target.value; renderFiles();
+  });
+
+  // ── VIEW TOGGLE ───────────────────────────────────────
+  document.getElementById('gridViewBtn').addEventListener('click', () => {
+    isListView = false;
+    document.getElementById('fileGrid').classList.remove('list-view');
+    document.getElementById('gridViewBtn').classList.add('active');
+    document.getElementById('listViewBtn').classList.remove('active');
+  });
+  document.getElementById('listViewBtn').addEventListener('click', () => {
+    isListView = true;
+    document.getElementById('fileGrid').classList.add('list-view');
+    document.getElementById('listViewBtn').classList.add('active');
+    document.getElementById('gridViewBtn').classList.remove('active');
+  });
+
+  // ── TOAST ─────────────────────────────────────────────
+  function toast(msg, type='info') {
+    const icons = { success:'✅', error:'❌', info:'ℹ️' };
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.innerHTML = `<span>${icons[type]}</span><span>${msg}</span>`;
+    document.getElementById('toastContainer').appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // ── INIT ──────────────────────────────────────────────
+  updateNav();
+  updateStatus();
+  renderFiles();
+</script>
+</body>
+</html>
